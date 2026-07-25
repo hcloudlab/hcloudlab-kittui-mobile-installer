@@ -1,0 +1,24 @@
+name: Test
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bats shellcheck
+      - name: Check shell syntax
+        run: bash -n bootstrap.sh
+      - name: Run ShellCheck
+        run: shellcheck bootstrap.sh tests/*.bats
+      - name: Run Bats
+        run: bats tests
