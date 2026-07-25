@@ -1,12 +1,14 @@
 # KitTUI Mobile Installer
 
-这是 [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile) 的公开安装入口。当前版本为 Beta，默认固定下载核心版本 `v0.2.0-beta.1`，不会默认运行 `main` 分支代码。
+这是 [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile) 的公开安装入口。当前版本为 Beta，installer 版本为 `v0.1.1`，默认固定下载核心版本 `v0.2.0-beta.2`，不会默认运行核心仓库的 `main` 分支代码。
 
 ## 一键安装
 
+普通用户推荐使用固定 installer 版本：
+
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/main/bootstrap.sh |
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.1/bootstrap.sh |
   sudo bash
 ```
 
@@ -14,8 +16,16 @@ curl -fsSL \
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/main/bootstrap.sh |
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.1/bootstrap.sh |
   sudo bash -s -- install --client shadowrocket
+```
+
+仅用于测试开发分支，不建议普通用户使用：
+
+```bash
+curl -fsSL \
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/main/bootstrap.sh |
+  sudo bash
 ```
 
 支持的客户端展示包括：
@@ -54,16 +64,18 @@ sudo kittui-mobile uninstall
 普通用户应使用默认固定版本。测试其他已发布核心 Tag 时，可使用：
 
 ```bash
-sudo env KML_CORE_VERSION=0.2.0-beta.1 bash bootstrap.sh install
+sudo env KML_CORE_VERSION=0.2.0-beta.2 bash bootstrap.sh install
 ```
 
 或：
 
 ```bash
-sudo bash bootstrap.sh --core-version 0.2.0-beta.1 install
+sudo bash bootstrap.sh --core-version 0.2.0-beta.2 install
 ```
 
 版本值只允许字母、数字、点、下划线和连字符，不能覆盖仓库或下载 URL。
+
+`v0.1.1` 仅修复 ShellCheck 0.10.0 的 CI 兼容性，并将默认核心更新到 `v0.2.0-beta.2`；bootstrap 的安全边界、参数透传和临时目录清理行为不变。
 
 ## 项目与反馈
 

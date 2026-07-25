@@ -2,10 +2,17 @@
 
 setup() {
   export PROJECT_ROOT="$BATS_TEST_DIRNAME/.."
-  export MOCK_BIN="$BATS_TEST_TMPDIR/bin"
-  export MOCK_RECORD_DIR="$BATS_TEST_TMPDIR/record"
-  export MOCK_ARCHIVE="$BATS_TEST_TMPDIR/core.tar.gz"
-  export TMPDIR="$BATS_TEST_TMPDIR/temp"
+  export KML_INSTALLER_TEST_TMPDIR="${BATS_TEST_TMPDIR:-}"
+  export KML_INSTALLER_TEST_TMPDIR_CREATED=false
+  if [[ -z "$KML_INSTALLER_TEST_TMPDIR" ]]; then
+    KML_INSTALLER_TEST_TMPDIR="$(mktemp -d "${TMPDIR:-/tmp}/kittui-mobile-installer-bats.XXXXXX")"
+    export KML_INSTALLER_TEST_TMPDIR
+    KML_INSTALLER_TEST_TMPDIR_CREATED=true
+  fi
+  export MOCK_BIN="$KML_INSTALLER_TEST_TMPDIR/bin"
+  export MOCK_RECORD_DIR="$KML_INSTALLER_TEST_TMPDIR/record"
+  export MOCK_ARCHIVE="$KML_INSTALLER_TEST_TMPDIR/core.tar.gz"
+  export TMPDIR="$KML_INSTALLER_TEST_TMPDIR/temp"
   export ORIGINAL_PATH="$PATH"
   mkdir -p "$MOCK_BIN" "$MOCK_RECORD_DIR" "$TMPDIR"
 
@@ -50,9 +57,16 @@ EOF
   unset KML_CORE_VERSION MOCK_NON_ROOT MOCK_DOWNLOAD_FAIL MOCK_INSTALL_EXIT
 }
 
+teardown() {
+  if [[ "${KML_INSTALLER_TEST_TMPDIR_CREATED:-false}" == "true" &&
+    -n "${KML_INSTALLER_TEST_TMPDIR:-}" && -d "$KML_INSTALLER_TEST_TMPDIR" ]]; then
+    rm -rf -- "$KML_INSTALLER_TEST_TMPDIR"
+  fi
+}
+
 create_mock_archive() {
   local mode="${1:-complete}"
-  local source_root="$BATS_TEST_TMPDIR/archive/kittui-mobile-v0.2.0-beta.1"
+  local source_root="$KML_INSTALLER_TEST_TMPDIR/archive/kittui-mobile-v0.2.0-beta.2"
 
   mkdir -p "$source_root/lib"
   cat > "$source_root/install.sh" <<'EOF'
@@ -66,7 +80,7 @@ EOF
     printf '%s\n' '# fake client output' > "$source_root/lib/client_output.sh"
   fi
   printf '%s\n' '# fake permissions' > "$source_root/lib/permissions.sh"
-  tar -czf "$MOCK_ARCHIVE" -C "$BATS_TEST_TMPDIR/archive" .
+  tar -czf "$MOCK_ARCHIVE" -C "$KML_INSTALLER_TEST_TMPDIR/archive" .
 }
 
 assert_temp_clean() {
@@ -81,15 +95,18 @@ assert_temp_clean() {
   run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
   [ "$(cat "$MOCK_RECORD_DIR/url")" = \
-    "https://github.com/hcloudlab/kittui-mobile/archive/refs/tags/v0.2.0-beta.1.tar.gz" ]
+    "https://github.com/hcloudlab/kittui-mobile/archive/refs/tags/v0.2.0-beta.2.tar.gz" ]
 }
 
-@test "VERSION matches the bootstrap default core version" {
+@test "VERSION identifies the installer release" {
   local version
   version="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
 
-  [ "$version" = "0.2.0-beta.1" ]
-  grep -Fq "KML_DEFAULT_CORE_VERSION=\"$version\"" "$PROJECT_ROOT/bootstrap.sh"
+  [ "$version" = "0.1.1" ]
+}
+
+@test "bootstrap default core version is the repaired immutable release" {
+  grep -Fq 'KML_DEFAULT_CORE_VERSION="0.2.0-beta.2"' "$PROJECT_ROOT/bootstrap.sh"
 }
 
 @test "install arguments pass through unchanged" {
@@ -106,13 +123,13 @@ assert_temp_clean() {
 @test "core version supports controlled environment and parameter overrides" {
   create_mock_archive
 
-  KML_CORE_VERSION="0.2.0-beta.2" run bash "$PROJECT_ROOT/bootstrap.sh" --help
-  [ "$status" -eq 0 ]
-  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.2.tar.gz" ]]
-
-  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=v0.2.0-beta.3 --help
+  KML_CORE_VERSION="0.2.0-beta.3" run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
   [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.3.tar.gz" ]]
+
+  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=v0.2.0-beta.4 --help
+  [ "$status" -eq 0 ]
+  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.4.tar.gz" ]]
 }
 
 @test "unsafe core versions are rejected before download" {

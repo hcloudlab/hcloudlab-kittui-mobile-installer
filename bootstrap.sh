@@ -2,7 +2,7 @@
 set -euo pipefail
 
 readonly KML_CORE_REPOSITORY="hcloudlab/kittui-mobile"
-readonly KML_DEFAULT_CORE_VERSION="0.2.0-beta.1"
+readonly KML_DEFAULT_CORE_VERSION="0.2.0-beta.2"
 
 kml_error() {
   printf '错误：%s\n' "$*" >&2
@@ -77,7 +77,7 @@ kml_core_tag() {
   fi
 }
 
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 kml_cleanup() {
   local exit_code="$?"
 
