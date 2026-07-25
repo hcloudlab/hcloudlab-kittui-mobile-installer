@@ -1,0 +1,14 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kittui-mobile-download",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-07-25",
+  "workers_dev": true,
+  "preview_urls": false,
+  "r2_buckets": [
+    {
+      "binding": "KML_PACKAGES",
+      "bucket_name": "kittui-mobile-private"
+    }
+  ]
+}

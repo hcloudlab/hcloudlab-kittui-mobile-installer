@@ -14,6 +14,8 @@ setup() {
   export MOCK_ARCHIVE="$KML_INSTALLER_TEST_TMPDIR/core.tar.gz"
   export TMPDIR="$KML_INSTALLER_TEST_TMPDIR/temp"
   export ORIGINAL_PATH="$PATH"
+  export ORIGINAL_TAR
+  ORIGINAL_TAR="$(command -v tar)"
   mkdir -p "$MOCK_BIN" "$MOCK_RECORD_DIR" "$TMPDIR"
 
   cat > "$MOCK_BIN/id" <<'EOF'
@@ -49,12 +51,39 @@ while [[ "$#" -gt 0 ]]; do
 done
 printf '%s\n' "$source_url" > "$MOCK_RECORD_DIR/url"
 [[ "${MOCK_DOWNLOAD_FAIL:-false}" != "true" ]] || exit 22
-cp "$MOCK_ARCHIVE" "$output_file"
+if [[ "${MOCK_CORRUPT_DOWNLOAD:-false}" == "true" ]]; then
+  printf '%s\n' 'not a gzip archive' > "$output_file"
+else
+  cp "$MOCK_ARCHIVE" "$output_file"
+fi
 EOF
 
-  chmod +x "$MOCK_BIN/id" "$MOCK_BIN/curl"
+  cat > "$MOCK_BIN/sha256sum" <<'EOF'
+#!/usr/bin/env bash
+archive_file=""
+for archive_file in "$@"; do
+  :
+done
+[[ "${MOCK_SHA256_COMMAND_FAIL:-false}" != "true" ]] || exit 1
+printf '%s  %s\n' \
+  "${MOCK_SHA256_VALUE:-aab667bca60ff4529749aee0e897545d66af1416bb4198dac80e4f0a1c6e51a7}" \
+  "$archive_file"
+EOF
+
+  cat > "$MOCK_BIN/tar" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${MOCK_UNSAFE_ARCHIVE_LIST:-false}" == "true" && "${1:-}" == "-tzf" ]]; then
+  printf '%s\n' '../escape'
+  exit 0
+fi
+exec "$ORIGINAL_TAR" "$@"
+EOF
+
+  chmod +x "$MOCK_BIN/id" "$MOCK_BIN/curl" "$MOCK_BIN/sha256sum" "$MOCK_BIN/tar"
   export PATH="$MOCK_BIN:$ORIGINAL_PATH"
-  unset KML_CORE_VERSION MOCK_NON_ROOT MOCK_DOWNLOAD_FAIL MOCK_INSTALL_EXIT
+  unset KML_CORE_VERSION MOCK_NON_ROOT MOCK_DOWNLOAD_FAIL MOCK_CORRUPT_DOWNLOAD
+  unset MOCK_SHA256_COMMAND_FAIL MOCK_SHA256_VALUE MOCK_UNSAFE_ARCHIVE_LIST
+  unset MOCK_INSTALL_EXIT
 }
 
 teardown() {
@@ -80,6 +109,9 @@ EOF
     printf '%s\n' '# fake client output' > "$source_root/lib/client_output.sh"
   fi
   printf '%s\n' '# fake permissions' > "$source_root/lib/permissions.sh"
+  if [[ "$mode" == "symlink" ]]; then
+    ln -s /etc/passwd "$source_root/lib/unsafe-link"
+  fi
   tar -czf "$MOCK_ARCHIVE" -C "$KML_INSTALLER_TEST_TMPDIR/archive" .
 }
 
@@ -89,24 +121,27 @@ assert_temp_clean() {
   [ -z "$leftovers" ]
 }
 
-@test "default version URL is fixed to the released core tag" {
+@test "default URL is fixed to the private R2 Worker release path" {
   create_mock_archive
 
   run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
   [ "$(cat "$MOCK_RECORD_DIR/url")" = \
-    "https://github.com/hcloudlab/kittui-mobile/archive/refs/tags/v0.2.0-beta.2.tar.gz" ]
+    "https://kittui-mobile-download.hexa46656.workers.dev/releases/v0.2.0-beta.2/kittui-mobile-v0.2.0-beta.2.tar.gz" ]
 }
 
 @test "VERSION identifies the installer release" {
   local version
   version="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
 
-  [ "$version" = "0.1.1" ]
+  [ "$version" = "0.1.2" ]
 }
 
-@test "bootstrap default core version is the repaired immutable release" {
+@test "bootstrap pins the immutable core version and SHA256" {
   grep -Fq 'KML_DEFAULT_CORE_VERSION="0.2.0-beta.2"' "$PROJECT_ROOT/bootstrap.sh"
+  grep -Fq \
+    'KML_CORE_ARCHIVE_SHA256="aab667bca60ff4529749aee0e897545d66af1416bb4198dac80e4f0a1c6e51a7"' \
+    "$PROJECT_ROOT/bootstrap.sh"
 }
 
 @test "install arguments pass through unchanged" {
@@ -120,26 +155,74 @@ assert_temp_clean() {
   [ "$(sed -n '4p' "$MOCK_RECORD_DIR/args")" = "--no-firewall" ]
 }
 
-@test "core version supports controlled environment and parameter overrides" {
+@test "core version accepts only the allowlisted release through controlled overrides" {
   create_mock_archive
 
-  KML_CORE_VERSION="0.2.0-beta.3" run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  KML_CORE_VERSION="v0.2.0-beta.2" run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
-  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.3.tar.gz" ]]
+  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.2/"* ]]
 
-  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=v0.2.0-beta.4 --help
+  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=0.2.0-beta.2 --help
   [ "$status" -eq 0 ]
-  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.4.tar.gz" ]]
+  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.2/"* ]]
 }
 
-@test "unsafe core versions are rejected before download" {
+@test "unsafe and unauthorized core versions are rejected before download" {
   local version
   create_mock_archive
 
-  for version in "" "../main" "https://example.com/a" "v1;id" "bad value"; do
+  for version in "" "../main" "https://example.com/a" "v1;id" "bad value" "0.2.0-beta.3"; do
+    rm -f "$MOCK_RECORD_DIR/url"
     run bash "$PROJECT_ROOT/bootstrap.sh" --core-version "$version" --help
     [ "$status" -ne 0 ]
+    [ ! -e "$MOCK_RECORD_DIR/url" ]
   done
+}
+
+@test "matching embedded SHA256 permits archive processing" {
+  create_mock_archive
+
+  run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -eq 0 ]
+}
+
+@test "SHA256 mismatch is rejected before archive processing and cleans temp" {
+  create_mock_archive
+  export MOCK_SHA256_VALUE="0000000000000000000000000000000000000000000000000000000000000000"
+
+  MOCK_UNSAFE_ARCHIVE_LIST=true run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"SHA256 校验失败"* ]]
+  [[ "$output" != *"不安全路径"* ]]
+  assert_temp_clean
+}
+
+@test "corrupt archive is rejected after checksum and cleans temp" {
+  create_mock_archive
+  export MOCK_CORRUPT_DOWNLOAD=true
+
+  run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"压缩包无法读取"* ]]
+  assert_temp_clean
+}
+
+@test "path traversal archive entry is rejected" {
+  create_mock_archive
+
+  MOCK_UNSAFE_ARCHIVE_LIST=true run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"不安全路径"* ]]
+  assert_temp_clean
+}
+
+@test "archive containing a symlink is rejected" {
+  create_mock_archive symlink
+
+  run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"符号链接或硬链接"* ]]
+  assert_temp_clean
 }
 
 @test "installer exit code is preserved and temporary source is removed" {
@@ -206,6 +289,9 @@ assert_temp_clean() {
     false
   fi
   if grep -Eq '(^|[[:space:]])eval([[:space:]]|$)|BASH_SOURCE' "$PROJECT_ROOT/bootstrap.sh"; then
+    false
+  fi
+  if grep -Fq 'github.com/hcloudlab/kittui-mobile' "$PROJECT_ROOT/bootstrap.sh"; then
     false
   fi
 }

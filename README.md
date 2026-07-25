@@ -1,6 +1,8 @@
 # KitTUI Mobile Installer
 
-这是 [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile) 的公开安装入口。当前版本为 Beta，installer 版本为 `v0.1.1`，默认固定下载核心版本 `v0.2.0-beta.2`，不会默认运行核心仓库的 `main` 分支代码。
+这是 [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile) 的公开安装入口。当前版本为 Beta，installer 版本为 `v0.1.2`，默认固定下载核心版本 `v0.2.0-beta.2`，不会运行核心仓库的 `main` 分支代码。
+
+核心源码归档由只读 Cloudflare Worker 从私有 R2 bucket 提供。installer 内嵌固定 Worker 下载地址、核心版本和发布归档 SHA256；只有完整性校验通过后才会读取并解压归档。安装流程不需要 Git、GitHub Token、R2 密钥或任意下载 URL。
 
 ## 一键安装
 
@@ -8,7 +10,7 @@
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.1/bootstrap.sh |
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.2/bootstrap.sh |
   sudo bash
 ```
 
@@ -16,7 +18,7 @@ curl -fsSL \
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.1/bootstrap.sh |
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.2/bootstrap.sh |
   sudo bash -s -- install --client shadowrocket
 ```
 
@@ -59,9 +61,9 @@ sudo kittui-mobile uninstall
 
 节点链接、订阅和二维码包含访问凭据，请勿公开分享、录屏或提交到 GitHub Issue。仅在你拥有管理权限的 VPS 上使用本项目。
 
-## 版本覆盖
+## 固定版本与完整性
 
-普通用户应使用默认固定版本。测试其他已发布核心 Tag 时，可使用：
+`v0.1.2` 只允许下载受支持列表中的核心版本。目前唯一允许的核心版本为 `v0.2.0-beta.2`。以下两种写法用于显式确认该版本：
 
 ```bash
 sudo env KML_CORE_VERSION=0.2.0-beta.2 bash bootstrap.sh install
@@ -73,9 +75,20 @@ sudo env KML_CORE_VERSION=0.2.0-beta.2 bash bootstrap.sh install
 sudo bash bootstrap.sh --core-version 0.2.0-beta.2 install
 ```
 
-版本值只允许字母、数字、点、下划线和连字符，不能覆盖仓库或下载 URL。
+版本值除字符校验外还必须命中 installer 的固定允许列表，不能覆盖 Worker、bucket、对象 key、SHA256 或任意下载 URL。
 
-`v0.1.1` 仅修复 ShellCheck 0.10.0 的 CI 兼容性，并将默认核心更新到 `v0.2.0-beta.2`；bootstrap 的安全边界、参数透传和临时目录清理行为不变。
+下载链路为：
+
+```text
+公开 installer v0.1.2
+  -> 固定 HTTPS Worker 路径
+  -> 私有 R2 bucket binding
+  -> 固定 v0.2.0-beta.2 归档
+  -> installer 内嵌 SHA256 校验
+  -> 安全检查并执行 install.sh
+```
+
+R2 bucket 不开启 `r2.dev` 或公开 bucket 域名。Worker 只允许 GET/HEAD 访问固定归档和校验文件，不提供目录列表、任意 key、上传或删除接口。
 
 ## 项目与反馈
 

@@ -8,28 +8,72 @@ permissions:
   contents: read
 
 jobs:
-  test:
+  shell:
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shellcheck_version: v0.10.0
+            shellcheck_sha256: 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
+            bats_version: 1.10.0
+          - shellcheck_version: v0.10.0
+            shellcheck_sha256: 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
+            bats_version: 1.13.0
+          - shellcheck_version: v0.11.0
+            shellcheck_sha256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+            bats_version: 1.10.0
+          - shellcheck_version: v0.11.0
+            shellcheck_sha256: 8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198
+            bats_version: 1.13.0
     env:
-      SHELLCHECK_VERSION: v0.10.0
-      SHELLCHECK_SHA256: 6c881ab0698e4e6ea235245f22832860544f17ba386442fe7e9d629f8cbedf87
+      SHELLCHECK_VERSION: ${{ matrix.shellcheck_version }}
+      SHELLCHECK_SHA256: ${{ matrix.shellcheck_sha256 }}
+      BATS_VERSION: ${{ matrix.bats_version }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
       - name: Install test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends bash curl tar xz-utils ca-certificates "bats=1.10.0-1"
-          test "$(bats --version)" = "Bats 1.10.0"
+          sudo apt-get install -y --no-install-recommends bash curl tar xz-utils ca-certificates
+          npm install --global "bats@${BATS_VERSION}"
+          test "$(bats --version)" = "Bats ${BATS_VERSION}"
       - name: Install fixed ShellCheck
         run: |
           curl -fsSL "https://github.com/koalaman/shellcheck/releases/download/${SHELLCHECK_VERSION}/shellcheck-${SHELLCHECK_VERSION}.linux.x86_64.tar.xz" -o /tmp/shellcheck.tar.xz
           printf '%s  %s\n' "$SHELLCHECK_SHA256" /tmp/shellcheck.tar.xz | sha256sum -c -
           tar -xJf /tmp/shellcheck.tar.xz -C /tmp
           sudo install -m 0755 "/tmp/shellcheck-${SHELLCHECK_VERSION}/shellcheck" /usr/local/bin/shellcheck
-          shellcheck --version | grep -q 'version: 0.10.0'
+          shellcheck --version | grep -Fq "version: ${SHELLCHECK_VERSION#v}"
       - name: Check shell syntax
         run: bash -n bootstrap.sh
       - name: Run ShellCheck
         run: shellcheck bootstrap.sh tests/*.bats
       - name: Run Bats
         run: bats tests
+
+  worker:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: worker
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: worker/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Run Worker tests
+        run: npm test
+      - name: Check Worker types
+        run: npx tsc --noEmit
+      - name: Validate Worker bundle
+        run: npx wrangler deploy --dry-run

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.1.2] - 2026-07-25
+
+### Changed
+
+- 将核心分发从 GitHub Tag archive 迁移到只读 Cloudflare Worker 和私有 R2 bucket。
+- 固定核心 `v0.2.0-beta.2` 的 Worker 路径和 SHA256，不再接受未列入允许列表的核心版本。
+- 在读取、列出或解压源码前强制校验 installer 内嵌 SHA256。
+- 保留 TLS、重试、参数透传、真实退出码和成功/失败临时目录清理。
+
+### Added
+
+- 新增 `worker/` TypeScript Worker、私有 R2 binding、固定路径 allowlist 和离线单元测试。
+- 新增 checksum mismatch、损坏归档、路径穿越、链接归档、未知版本和 Worker 方法/路径回归测试。
+- CI 新增 ShellCheck 0.10/0.11、Bats 1.10/1.13 和 Worker npm/typecheck/dry-run 门禁。
+
+### Security
+
+- R2 bucket 保持私有，未启用 `r2.dev` 或公开 bucket 域名。
+- Worker 仅允许 GET/HEAD 访问固定对象，不支持列目录、任意 key、PUT、POST、PATCH 或 DELETE。
+- installer 不包含 GitHub/Cloudflare 凭据、账户标识或任意下载 URL 覆盖。
+
 ## [0.1.1] - 2026-07-25
 
 ### Fixed
