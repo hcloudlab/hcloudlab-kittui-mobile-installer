@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly KML_DEFAULT_CORE_VERSION="0.2.0-beta.2"
+readonly KML_DEFAULT_CORE_VERSION="0.2.0-beta.3"
 readonly KML_CORE_DOWNLOAD_ORIGIN="https://kittui-mobile-download.hexa46656.workers.dev"
-readonly KML_CORE_ARCHIVE_SHA256="aab667bca60ff4529749aee0e897545d66af1416bb4198dac80e4f0a1c6e51a7"
+readonly KML_CORE_ARCHIVE_SHA256="185708092eb1de8107861f2b9a35ac09953d332dc17bcd245269634dd01a58e7"
 
 kml_error() {
   printf '错误：%s\n' "$*" >&2
@@ -72,8 +72,8 @@ kml_parse_args() {
 
 kml_resolve_core_release() {
   case "$KML_SELECTED_CORE_VERSION" in
-    0.2.0-beta.2|v0.2.0-beta.2)
-      KML_CORE_TAG="v0.2.0-beta.2"
+    0.2.0-beta.3|v0.2.0-beta.3)
+      KML_CORE_TAG="v0.2.0-beta.3"
       KML_CORE_ARCHIVE_URL="$KML_CORE_DOWNLOAD_ORIGIN/releases/$KML_CORE_TAG/kittui-mobile-$KML_CORE_TAG.tar.gz"
       KML_EXPECTED_ARCHIVE_SHA256="$KML_CORE_ARCHIVE_SHA256"
       ;;

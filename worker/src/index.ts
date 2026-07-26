@@ -8,21 +8,27 @@ interface AllowedObject {
   contentDisposition?: string;
 }
 
-const CORE_VERSION = "v0.2.0-beta.2";
-const ARCHIVE_NAME = `kittui-mobile-${CORE_VERSION}.tar.gz`;
-const ARCHIVE_PATH = `/releases/${CORE_VERSION}/${ARCHIVE_NAME}`;
-const CHECKSUM_PATH = `${ARCHIVE_PATH}.sha256`;
+function releaseObjects(coreVersion: string): Record<string, AllowedObject> {
+  const archiveName = `kittui-mobile-${coreVersion}.tar.gz`;
+  const archivePath = `/releases/${coreVersion}/${archiveName}`;
+  const checksumPath = `${archivePath}.sha256`;
+
+  return {
+    [archivePath]: {
+      key: archivePath.slice(1),
+      contentType: "application/gzip",
+      contentDisposition: `attachment; filename="${archiveName}"`,
+    },
+    [checksumPath]: {
+      key: checksumPath.slice(1),
+      contentType: "text/plain; charset=utf-8",
+    },
+  };
+}
 
 const ALLOWED_OBJECTS: Readonly<Record<string, AllowedObject>> = Object.freeze({
-  [ARCHIVE_PATH]: {
-    key: ARCHIVE_PATH.slice(1),
-    contentType: "application/gzip",
-    contentDisposition: `attachment; filename="${ARCHIVE_NAME}"`,
-  },
-  [CHECKSUM_PATH]: {
-    key: CHECKSUM_PATH.slice(1),
-    contentType: "text/plain; charset=utf-8",
-  },
+  ...releaseObjects("v0.2.0-beta.2"),
+  ...releaseObjects("v0.2.0-beta.3"),
 });
 
 function baseHeaders(contentType: string): Headers {

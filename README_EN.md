@@ -1,6 +1,6 @@
 # KitTUI Mobile Installer
 
-This is the public installation entry point for [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile). It is currently Beta software. Installer version `v0.1.2` pins core version `v0.2.0-beta.2` and does not execute code from the core repository's `main` branch.
+This is the public installation entry point for [KitTUI Mobile Lite](https://github.com/hcloudlab/kittui-mobile). It is currently Beta software. Installer version `v0.1.3` pins core version `v0.2.0-beta.3` and does not execute code from the core repository's `main` branch.
 
 The core source archive is served by a read-only Cloudflare Worker backed by a private R2 bucket. The installer embeds the fixed Worker URL, core version, and release archive SHA256. It reads and extracts the archive only after the integrity check succeeds. Installation requires no Git, GitHub token, R2 credential, or arbitrary download URL.
 
@@ -10,15 +10,15 @@ The fixed installer release is recommended for regular users:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.2/bootstrap.sh |
-  sudo bash
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.3/bootstrap.sh |
+  sudo bash -s -- install
 ```
 
 Select a client:
 
 ```bash
 curl -fsSL \
-  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.2/bootstrap.sh |
+  https://raw.githubusercontent.com/hcloudlab/hcloudlab-kittui-mobile-installer/v0.1.3/bootstrap.sh |
   sudo bash -s -- install --client shadowrocket
 ```
 
@@ -63,16 +63,16 @@ Node links, subscriptions, and QR codes contain access credentials. Do not publi
 
 ## Fixed version and integrity
 
-Installer `v0.1.2` accepts only allowlisted core releases. The only currently supported core release is `v0.2.0-beta.2`. Either form below explicitly selects it:
+Installer `v0.1.3` accepts only allowlisted core releases. The only currently supported core release is `v0.2.0-beta.3`. Either form below explicitly selects it:
 
 ```bash
-sudo env KML_CORE_VERSION=0.2.0-beta.2 bash bootstrap.sh install
+sudo env KML_CORE_VERSION=0.2.0-beta.3 bash bootstrap.sh install
 ```
 
 or:
 
 ```bash
-sudo bash bootstrap.sh --core-version 0.2.0-beta.2 install
+sudo bash bootstrap.sh --core-version 0.2.0-beta.3 install
 ```
 
 In addition to character validation, a version must match the installer's fixed allowlist. It cannot override the Worker, bucket, object key, SHA256, or any download URL.
@@ -80,10 +80,10 @@ In addition to character validation, a version must match the installer's fixed 
 The download chain is:
 
 ```text
-public installer v0.1.2
+public installer v0.1.3
   -> fixed HTTPS Worker path
   -> private R2 bucket binding
-  -> fixed v0.2.0-beta.2 archive
+  -> fixed v0.2.0-beta.3 archive
   -> installer-embedded SHA256 verification
   -> safety checks and install.sh
 ```

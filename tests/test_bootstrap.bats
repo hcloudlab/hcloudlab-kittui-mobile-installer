@@ -66,7 +66,7 @@ for archive_file in "$@"; do
 done
 [[ "${MOCK_SHA256_COMMAND_FAIL:-false}" != "true" ]] || exit 1
 printf '%s  %s\n' \
-  "${MOCK_SHA256_VALUE:-aab667bca60ff4529749aee0e897545d66af1416bb4198dac80e4f0a1c6e51a7}" \
+  "${MOCK_SHA256_VALUE:-185708092eb1de8107861f2b9a35ac09953d332dc17bcd245269634dd01a58e7}" \
   "$archive_file"
 EOF
 
@@ -95,7 +95,7 @@ teardown() {
 
 create_mock_archive() {
   local mode="${1:-complete}"
-  local source_root="$KML_INSTALLER_TEST_TMPDIR/archive/kittui-mobile-v0.2.0-beta.2"
+  local source_root="$KML_INSTALLER_TEST_TMPDIR/archive/kittui-mobile-v0.2.0-beta.3"
 
   mkdir -p "$source_root/lib"
   cat > "$source_root/install.sh" <<'EOF'
@@ -112,6 +112,9 @@ EOF
   if [[ "$mode" == "symlink" ]]; then
     ln -s /etc/passwd "$source_root/lib/unsafe-link"
   fi
+  if [[ "$mode" == "hardlink" ]]; then
+    ln "$source_root/lib/main.sh" "$source_root/lib/unsafe-hardlink"
+  fi
   tar -czf "$MOCK_ARCHIVE" -C "$KML_INSTALLER_TEST_TMPDIR/archive" .
 }
 
@@ -127,20 +130,20 @@ assert_temp_clean() {
   run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
   [ "$(cat "$MOCK_RECORD_DIR/url")" = \
-    "https://kittui-mobile-download.hexa46656.workers.dev/releases/v0.2.0-beta.2/kittui-mobile-v0.2.0-beta.2.tar.gz" ]
+    "https://kittui-mobile-download.hexa46656.workers.dev/releases/v0.2.0-beta.3/kittui-mobile-v0.2.0-beta.3.tar.gz" ]
 }
 
 @test "VERSION identifies the installer release" {
   local version
   version="$(tr -d '[:space:]' < "$PROJECT_ROOT/VERSION")"
 
-  [ "$version" = "0.1.2" ]
+  [ "$version" = "0.1.3" ]
 }
 
 @test "bootstrap pins the immutable core version and SHA256" {
-  grep -Fq 'KML_DEFAULT_CORE_VERSION="0.2.0-beta.2"' "$PROJECT_ROOT/bootstrap.sh"
+  grep -Fq 'KML_DEFAULT_CORE_VERSION="0.2.0-beta.3"' "$PROJECT_ROOT/bootstrap.sh"
   grep -Fq \
-    'KML_CORE_ARCHIVE_SHA256="aab667bca60ff4529749aee0e897545d66af1416bb4198dac80e4f0a1c6e51a7"' \
+    'KML_CORE_ARCHIVE_SHA256="185708092eb1de8107861f2b9a35ac09953d332dc17bcd245269634dd01a58e7"' \
     "$PROJECT_ROOT/bootstrap.sh"
 }
 
@@ -158,20 +161,20 @@ assert_temp_clean() {
 @test "core version accepts only the allowlisted release through controlled overrides" {
   create_mock_archive
 
-  KML_CORE_VERSION="v0.2.0-beta.2" run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  KML_CORE_VERSION="v0.2.0-beta.3" run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -eq 0 ]
-  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.2/"* ]]
+  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.3/"* ]]
 
-  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=0.2.0-beta.2 --help
+  run bash "$PROJECT_ROOT/bootstrap.sh" --core-version=0.2.0-beta.3 --help
   [ "$status" -eq 0 ]
-  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.2/"* ]]
+  [[ "$(cat "$MOCK_RECORD_DIR/url")" == *"/v0.2.0-beta.3/"* ]]
 }
 
 @test "unsafe and unauthorized core versions are rejected before download" {
   local version
   create_mock_archive
 
-  for version in "" "../main" "https://example.com/a" "v1;id" "bad value" "0.2.0-beta.3"; do
+  for version in "" "../main" "https://example.com/a" "v1;id" "bad value" "0.2.0-beta.2"; do
     rm -f "$MOCK_RECORD_DIR/url"
     run bash "$PROJECT_ROOT/bootstrap.sh" --core-version "$version" --help
     [ "$status" -ne 0 ]
@@ -218,6 +221,15 @@ assert_temp_clean() {
 
 @test "archive containing a symlink is rejected" {
   create_mock_archive symlink
+
+  run bash "$PROJECT_ROOT/bootstrap.sh" --help
+  [ "$status" -ne 0 ]
+  [[ "$output" == *"符号链接或硬链接"* ]]
+  assert_temp_clean
+}
+
+@test "archive containing a hard link is rejected" {
+  create_mock_archive hardlink
 
   run bash "$PROJECT_ROOT/bootstrap.sh" --help
   [ "$status" -ne 0 ]

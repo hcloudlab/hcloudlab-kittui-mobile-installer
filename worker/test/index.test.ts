@@ -1,14 +1,19 @@
 import { describe, expect, it } from "vitest";
 import worker from "../src/index";
 
-const archivePath =
+const beta2ArchivePath =
   "/releases/v0.2.0-beta.2/kittui-mobile-v0.2.0-beta.2.tar.gz";
-const checksumPath = `${archivePath}.sha256`;
+const beta2ChecksumPath = `${beta2ArchivePath}.sha256`;
+const beta3ArchivePath =
+  "/releases/v0.2.0-beta.3/kittui-mobile-v0.2.0-beta.3.tar.gz";
+const beta3ChecksumPath = `${beta3ArchivePath}.sha256`;
 
 class FakeBucket {
   readonly objects = new Map<string, Uint8Array>([
-    [archivePath.slice(1), new TextEncoder().encode("archive")],
-    [checksumPath.slice(1), new TextEncoder().encode("hash  archive\n")],
+    [beta2ArchivePath.slice(1), new TextEncoder().encode("beta2 archive")],
+    [beta2ChecksumPath.slice(1), new TextEncoder().encode("beta2 hash\n")],
+    [beta3ArchivePath.slice(1), new TextEncoder().encode("beta3 archive")],
+    [beta3ChecksumPath.slice(1), new TextEncoder().encode("beta3 hash\n")],
   ]);
 
   async get(key: string): Promise<R2ObjectBody | null> {
@@ -77,46 +82,61 @@ describe("download worker", () => {
     expect(await response.text()).toBe("ok\n");
   });
 
-  it("serves only the fixed archive with immutable download headers", async () => {
+  it("serves the beta.3 archive with immutable download headers", async () => {
     const response = await worker.fetch(
-      new Request(`https://example.test${archivePath}`),
+      new Request(`https://example.test${beta3ArchivePath}`),
       env(),
     );
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe("archive");
+    expect(await response.text()).toBe("beta3 archive");
     expect(response.headers.get("content-type")).toBe("application/gzip");
     expect(response.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable",
     );
     expect(response.headers.get("content-disposition")).toBe(
-      'attachment; filename="kittui-mobile-v0.2.0-beta.2.tar.gz"',
+      'attachment; filename="kittui-mobile-v0.2.0-beta.3.tar.gz"',
     );
     expect(response.headers.get("x-content-type-options")).toBe("nosniff");
   });
 
-  it("serves the fixed checksum as plain text", async () => {
+  it("serves the beta.3 checksum as plain text", async () => {
     const response = await worker.fetch(
-      new Request(`https://example.test${checksumPath}`),
+      new Request(`https://example.test${beta3ChecksumPath}`),
       env(),
     );
 
     expect(response.status).toBe(200);
-    expect(await response.text()).toBe("hash  archive\n");
+    expect(await response.text()).toBe("beta3 hash\n");
     expect(response.headers.get("content-type")).toBe(
       "text/plain; charset=utf-8",
     );
   });
 
+  it("keeps the beta.2 archive available", async () => {
+    const response = await worker.fetch(
+      new Request(`https://example.test${beta2ArchivePath}`),
+      env(),
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("beta2 archive");
+    expect(response.headers.get("content-disposition")).toBe(
+      'attachment; filename="kittui-mobile-v0.2.0-beta.2.tar.gz"',
+    );
+  });
+
   it("returns HEAD metadata without a body", async () => {
     const response = await worker.fetch(
-      new Request(`https://example.test${archivePath}`, { method: "HEAD" }),
+      new Request(`https://example.test${beta3ArchivePath}`, {
+        method: "HEAD",
+      }),
       env(),
     );
 
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("");
-    expect(response.headers.get("content-length")).toBe("7");
+    expect(response.headers.get("content-length")).toBe("13");
     expect(response.headers.get("etag")).toBe('"test-etag"');
   });
 
@@ -124,8 +144,8 @@ describe("download worker", () => {
     for (const path of [
       "/",
       "/releases/",
-      "/releases/v0.2.0-beta.2/unknown.tar.gz",
-      "/releases/v0.2.0-beta.2/../secret",
+      "/releases/v0.2.0-beta.3/unknown.tar.gz",
+      "/releases/v0.2.0-beta.3/../secret",
       "/releases/%2e%2e/secret",
     ]) {
       const response = await worker.fetch(
@@ -139,7 +159,7 @@ describe("download worker", () => {
   it("returns 405 and Allow for every unsupported method", async () => {
     for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
       const response = await worker.fetch(
-        new Request(`https://example.test${archivePath}`, { method }),
+        new Request(`https://example.test${beta3ArchivePath}`, { method }),
         env(),
       );
       expect(response.status).toBe(405);
@@ -149,10 +169,10 @@ describe("download worker", () => {
 
   it("returns 404 when an allowlisted object is absent", async () => {
     const bucket = new FakeBucket();
-    bucket.objects.delete(archivePath.slice(1));
+    bucket.objects.delete(beta3ArchivePath.slice(1));
 
     const response = await worker.fetch(
-      new Request(`https://example.test${archivePath}`),
+      new Request(`https://example.test${beta3ArchivePath}`),
       env(bucket),
     );
     expect(response.status).toBe(404);

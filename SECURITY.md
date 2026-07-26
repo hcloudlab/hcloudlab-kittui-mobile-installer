@@ -24,7 +24,7 @@ https://github.com/hcloudlab/hcloudlab-kittui-mobile-installer/issues
 
 The public `bootstrap.sh` can be reviewed before execution. A fixed installer release, fixed core version, fixed Worker path, and embedded SHA256 are safer and more reproducible than directly running changing `main` branch content.
 
-The bootstrap downloads only the allowlisted `v0.2.0-beta.2` archive through the read-only HTTPS Worker. It verifies the installer-embedded SHA256 before listing or extracting the archive, rejects unsafe paths and links, and then verifies required files.
+The bootstrap downloads only the allowlisted `v0.2.0-beta.3` archive through the read-only HTTPS Worker. It verifies the installer-embedded SHA256 before listing or extracting the archive, rejects unsafe paths and links, and then verifies required files.
 
 The R2 bucket remains private. Public bucket access and `r2.dev` are disabled. The Worker exposes only `/healthz` plus the fixed archive and checksum paths over GET/HEAD; it has no listing, arbitrary-key, write, or delete route.
 
